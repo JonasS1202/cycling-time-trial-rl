@@ -5,3 +5,7 @@ tyro
 tensorboard
 matplotlib
 scipy
+pandas
+gpxpy
+fitparse
+requests

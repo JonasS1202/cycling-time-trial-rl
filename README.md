@@ -1,162 +1,96 @@
+# Deep Reinforcement Learning for Time Trial Pacing Strategy Optimization
 
-# Cycling RL: Wind-Aware Pacing Optimizer
-
-A reinforcement-learning toolkit for optimizing pacing strategies in Individual Time Trials (ITT) with support for **complex terrain**, **wind physics**, and **energy management (W' balance)**.
+This repository contains the codebase for the Bachelor Thesis "Deep Reinforcement Learning for Pacing Strategy Optimization in Individual Time Trials". It implements a Soft Actor-Critic (SAC) agent capable of optimizing power output for cyclists on complex terrains, considering physical constraints and physiological fatigue (W' balance).
 
 ## Features
-- **Physics Engine**: Calculates speed based on power, gradient, air resistance (CdA), rolling resistance (Crr), and gravity.
-- **Physiology Model**: Tracks W' Balance (Anaerobic Work Capacity) to simulate exhaustion and recovery.
-- **Environment**: Gymnasium-compatible `CyclistITT-v0` environment.
-- **Algorithms**: Training support for PPO (Discrete) and SAC (Continuous).
-- **GPX Support**: Train/Evaluate on real-world course files.
-- **Observation Space**: Robust, sector-based lookahead system for "smart" course foresight.
+
+- **Physics Engine**: Simulation of cycling dynamics including gradient, air density, rolling resistance, and gravity.
+- **Physiology Model**: Critical Power (CP) and W' Balance (Anaerobic Work Capacity) model to simulate exhaustion and recovery.
+- **Environment**: Custom Gymnasium-compatible `CyclistITT-v0` environment.
+- **Algorithm**: Soft Actor-Critic (SAC) implementation for continuous power control.
+- **Course Processing**: Support for GPX files with automated segmentation and gradient smoothing.
+- **Lookahead System**: Environment observation includes foresight of upcoming terrain features.
 
 ---
 
-## 🚀 Setup
+## Setup
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/JonasS1202/cycling_rl.git
-    cd cycling_rl
-    ```
-
-2.  **Install dependencies:**
-    It is recommended to use a virtual environment.
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate
-    pip install -r requirements.txt
-    ```
-
----
-
-## 🏋️ Training the Agent
-
-Use the `train.py` wrapper to start training. You can choose between PPO (Discrete Action Space) and SAC (Continuous Action Space).
-
-### 1. Train with PPO (Recommended)
-PPO uses discrete power levels (e.g., 0.5x CP, 1.0x CP, 1.5x CP).
+### 1. Clone the repository
 ```bash
-python train.py --algo ppo --total-timesteps 2000000
+git clone https://github.com/JonasS1202/cycling-time-trial-rl.git
+cd cycling-time-trial-rl
 ```
 
-### 2. Train with SAC
-SAC allows the agent to essentially "choose any wattage" (Continuous).
+### 2. Install dependencies
+It is recommended to use a virtual environment (Python 3.8+).
+
 ```bash
-python train.py --algo sac --total-timesteps 1000000
-```
-
-### Advanced Training Options
-All extra arguments are passed to the underlying scripts (`ppo.py` / `sac_continous_action.py`).
-- **Track with Tensorboard**:
-    ```bash
-    tensorboard --logdir runs
-    ```
-    *Note: Training logs are saved to `runs/ExperimentName_...`*
-
----
-
-## 🗺️ Course Segmentation
-
-You can pre-segment a GPX course to verify the gradient "chunks" the agent will see.
-
-### Run Segmentation & Plot
-```bash
-python gpx_segmenter.py --file files/ridermanTT.gpx
-```
-* **Output**: `segments/ridermanTT_segmented.png`
-
-### Run Segmentation via Training Script
-This is useful if you want to quickly check the segmentation logic used by the environment without training.
-```bash
-python train.py --algo ppo --only-segment
+python -m venv .venv
+source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
 ---
 
-## 🔬 Simulation & Verification
+## Training
 
-Verify the physics engine against real-world ride data (.fit or .gpx files). This compares standard physics models against recorded speed/power.
+The training process uses the Soft Actor-Critic (SAC) algorithm. The agent learns to map state observations (velocity, fatigue, upcoming gradient) to optimal power output.
 
-### Run Verification Simulation
+To start training:
 ```bash
-python simulation.py files/ridermanTT.gpx --no-weather
+python train.py --total-timesteps 1000000
 ```
-* **Output**: Terminal stats (`Avg Speed`, `Diff` in time) + Plot in `runs/simulation_verification_pictures/`.
+
+### Optional Arguments
+- `--total-timesteps`: Number of interaction steps (default: 1,000,000).
+- `--learning-rate`: Learning rate for the optimizer.
+- `--buffer-size`: Replay buffer size.
+- `--batch-size`: Batch size for updates.
+
+Training logs are saved to the `runs/` directory and can be visualized using TensorBoard:
+```bash
+tensorboard --logdir runs
+```
 
 ---
 
-## 📈 Evaluation & Visualization
+## Evaluation
 
-Once trained, use `evaluate.py` to watch your agent race.
+Use `evaluate.py` to test the trained model on specific courses.
 
 ### Basic Evaluation
 ```bash
-python evaluate.py --model-path runs/YourExperimentName/ppo.cleanrl_model
+python evaluate.py --model-path runs/YourExperimentName/sac_model.pt
 ```
-* **Result**: Generates a `pacing_strategy.png` in the run folder showing Speed, Power, W' Balance, and Elevation.
+This generates a `pacing_strategy.png` visualizing Speed, Power, W' Balance, and Elevation over the course.
 
-### Evaluate on a Specific GPX Course
-Test how your agent handles a real-world file.
+### Evaluation on GPX Courses
+To test on a real-world track:
 ```bash
-python evaluate.py --model-path runs/YourRun/model.pt --gpx-file files/my_course.gpx
+python evaluate.py --model-path runs/YourExperimentName/sac_model.pt --gpx-file files/ridermanTT.gpx
 ```
 
-### Compare with Constant Power Baseline
-Generate a pacing strategy for a constant power output coverage (e.g., 300W).
-```bash
-python evaluate.py --baseline-power 300 --gpx-file files/ridermanTT.gpx
-```
-* **Result**: Saves plot to `baselines/`.
-
-### Optimize Baseline (Best Constant Power)
-Finds the theoretical best constant power for a course and simulates it.
+### Comparison with Baseline
+Compare the agent's strategy against an Optimal Constant Power (OCP) baseline. The OCP is the highest constant power the cyclist can sustain without exhaustion for the specific course duration.
 ```bash
 python evaluate.py --optimize-baseline --gpx-file files/ridermanTT.gpx
 ```
 
-### Wind sensitivity test (North vs South)
-Runs evaluation twice with opposing winds to see strategy adaptation.
-```bash
-python evaluate.py --model-path runs/YourModel.pt --gpx-file files/course.gpx --wind-scan --wind-speed 5.0
-```
-
 ---
 
-## 🛠️ Development & Debugging
+## Project Structure
 
-### Check Environment Compliance
-Run this to ensure the Gymnasium environment is valid and the observation space is correct.
+- `cyclist_env.py`: Custom Gymnasium environment implementing the MDP (Markov Decision Process).
+- `sac_continous_action.py`: Implementation of the Soft Actor-Critic algorithm (based on CleanRL).
+- `train.py`: Entry point for training experiments.
+- `evaluate.py`: Scripts for model evaluation and visualization.
+- `physics_engine.py`: Core physics calculations (Newtonian mechanics for cycling).
+- `gpx_segmenter.py`: Utility for processing GPX files and segmenting courses.
+- `check_env.py`: Utility to verify Gymnasium environment compliance.
+
+## Environment Verification
+
+To ensure the environment adheres to the Gymnasium API standards:
 ```bash
 python check_env.py
 ```
-
-### Debugging GPX Segmentation Optimization
-To debug the "Optimization" mode (Differential Evolution) of segmentation pacing:
-```bash
-python gpx_segmenter.py --file files/ridermanTT.gpx
-```
-*(Without `--segment-only`, it runs the optimizer)*
-
----
-
-## 📂 Project Structure
-
-- `cyclist_env.py`: The core Gymnasium environment with Update Physics and Reward Logic.
-- `train.py`: Unified entry point for training.
-- `ppo.py` / `sac_continous_action.py`: RL algorithms (CleanRL based).
-- `evaluate.py`: Evaluation script with Matplotlib visualization.
-- `physics_engine.py`: Shared core physics logic (`SimulatedRider`).
-- `utils.py`: Shared file loading (`load_track`) and geometry helpers.
-- `gpx_segmenter.py`: Tool for segmenting courses and optimizing "perfect knowledge" baselines.
-- `simulation.py`: Verification tool comparing physics model vs real ride data.
-
----
-
-## ⚠️ Common Issues
-
-- **`tensorboard: command not found`**: 
-  Ensure you have activated your virtual environment: `source .venv/bin/activate`.
-- **`ModuleNotFoundError`**: 
-  Always run scripts from the root directory: `python3 scripts/script.name` (or install as package).

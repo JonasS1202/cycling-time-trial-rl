@@ -768,6 +768,13 @@ class CyclistITTEnv(gym.Env):
             # Clip just in case
             norm_d = max(0.0, min(1.0, norm_d))
             target_segment_dist = min_d + (max_d - min_d) * norm_d
+        else:
+            # Discrete Action
+            power_multiplier = self.power_multipliers[action]
+            self.target_power = power_multiplier * self.critical_power
+            # Default distance if not fixed segments
+            target_segment_dist = config.Action.MIN_SEGMENT_DISTANCE 
+
         # FIXED SEGMENT OVERRIDE
         if self.use_fixed_segments:
             # Find current segment
@@ -778,19 +785,7 @@ class CyclistITTEnv(gym.Env):
                 # Get that segment's end
                 if seg_id < len(self.segments):
                     seg = self.segments[seg_id]
-                    # Target is the end of this segment relative to current, 
-                    # but the loop logic below uses "segment_dist_covered < target_segment_dist"
-                    # so target_segment_dist should be the REMAINING length of this segment?
-                    # Or the full length?
-                    # Loop logic: 
-                    # while segment_dist_covered < target_segment_dist:
-                    #      ...
-                    #      segment_dist_covered += speed * dt
-                       
-                    # So target_segment_dist is "Distance to traverse in this step".
-                    # If we are in the middle of a segment (unlikely if we align perfectly),
-                    # we want to go until the end.
-                       
+                    # Target is the end of this segment relative to current
                     # self.segments uses Env Indices (Meters).
                     seg_end_dist = float(seg['end'])
                     dist_remaining_in_segment = seg_end_dist - self.distance_covered
@@ -799,13 +794,6 @@ class CyclistITTEnv(gym.Env):
             else:
                 # Fallback if map not built (should not happen)
                 target_segment_dist = config.Action.MIN_SEGMENT_DISTANCE
-             
-        else:
-            # Fallback for discrete - strictly power, fixed distance?
-            # Or not supported properly yet. Assuming Continuous for this task.
-            power_multiplier = self.power_multipliers[action]
-            self.target_power = power_multiplier * self.critical_power
-            target_segment_dist = config.Action.MIN_SEGMENT_DISTANCE # Default for discrete?
 
         # Locked Power Logic: Instant Application
         current_segment_power = self.target_power

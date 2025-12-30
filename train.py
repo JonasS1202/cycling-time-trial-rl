@@ -6,8 +6,8 @@ import gpx_segmenter
 import config
 
 def main():
-    parser = argparse.ArgumentParser(description="Train cycling RL agent")
-    parser.add_argument("--algo", choices=["ppo", "sac"], required=True, help="Algorithm to use (ppo or sac)")
+    parser = argparse.ArgumentParser(description="Train cycling RL agent (SAC)")
+    parser.add_argument("--algo", choices=["sac"], default="sac", help="Algorithm to use (default: sac)")
     parser.add_argument("--only-segment", action="store_true", help="Only run segmentation and generate plot, then exit.")
     
     # parse_known_args returns (namespace, list_of_unknown_args)
@@ -18,7 +18,6 @@ def main():
     if args.only_segment:
         print("Running Segmentation Only...")
         # Get default file from config or guess
-        # Actually, CyclistITTEnv uses a kwarg or specific path. 
         # Typically the scripts hardcode 'files/ridermanTT.gpx' or read from argument.
         # If --file was passed in unknown_args, we should grab it.
         
@@ -36,10 +35,10 @@ def main():
         return
 
     # We want the sub-script to see the unknown args as its own sys.argv
-    # We prepend the script name (ppo.py or sac...py) so it looks like a normal invocation
+    # We prepend the script name so it looks like a normal invocation
     
-    script_name = "ppo.py" if args.algo == "ppo" else "sac_continous_action.py"
-    print(f"Starting {args.algo.upper()} training...")
+    script_name = "sac_continous_action.py"
+    print(f"Starting SAC training...")
     
     p = subprocess.Popen([sys.executable, script_name] + unknown_args)
     
